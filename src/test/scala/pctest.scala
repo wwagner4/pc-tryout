@@ -20,10 +20,10 @@ object PropParser extends PropParser {
 
 /* BNF
 
-props     ::= [prop]
+props     ::= {prop}
 prop      ::= name '=' value
 value     ::= listVal | singleVal
-listVal   ::= '(' [aVal] ')'
+listVal   ::= '(' {aVal} ')'
 singleVal ::= aVal
 aVal      ::= '\w+'
 name      ::= '\w+' 
@@ -43,19 +43,19 @@ trait PropParser extends RegexParsers {
        }
   }
 
-  def props: Parser[List[Prop]]    = rep1(prop)                  ^^ {case v => v}  
+  def props: Parser[List[Prop]]    = rep(prop)              ^^ {case v => v}  
   
-  def prop: Parser[Prop]           = name ~ "=" ~ value          ^^ {case n ~ _ ~ v => Prop(n, v)}  
+  def prop: Parser[Prop]           = name ~ "=" ~ value     ^^ {case n ~ _ ~ v => Prop(n, v)}  
 
-  def value: Parser[Value]         = listVal | singleVal         ^^ {case v => v }
+  def value: Parser[Value]         = listVal | singleVal    ^^ {case v => v }
   
-  def listVal: Parser[ListVal]     = "(" ~ rep1(aVal) ~ ")"      ^^ {case _ ~ v ~ _ => ListVal(v)}
+  def listVal: Parser[ListVal]     = "(" ~ rep(aVal) ~ ")"  ^^ {case _ ~ v ~ _ => ListVal(v)}
 
-  def singleVal: Parser[SingleVal] = aVal                        ^^ {case v => SingleVal(v)}
+  def singleVal: Parser[SingleVal] = aVal                   ^^ {case v => SingleVal(v)}
 
-  def aVal : Parser[String]        = """\w+""".r                 ^^ {case v => v}
+  def aVal : Parser[String]        = """\w+""".r            ^^ {case v => v}
 
-  def name: Parser[String]         = """\w+""".r                 ^^ {case v => v}  
+  def name: Parser[String]         = """\w+""".r            ^^ {case v => v}  
 
 
   /**
@@ -95,11 +95,10 @@ c = 123456
   
   test ("props: three prop") {
        new PropParser {
-           val t = """
-a = (1 2)
-b =hallo
-c = 123456
-"""
+           val t = 
+             """|a = (1 2)
+                |b =hallo
+                |c = 123456""".stripMargin
            val r = List(
               Prop("a", ListVal(List("1", "2"))),
               Prop("b", SingleVal("hallo")),
@@ -119,37 +118,71 @@ b = hallo
            assert(r === parseRule(props, t))
        }
   }
+  test ("props: two props in one line") {
+       new PropParser {
+           val t = "a = (1 2) b = hallo"
+           val r = List(
+              Prop("a", ListVal(List("1", "2"))),
+              Prop("b", SingleVal("hallo")))
+           assert(r === parseRule(props, t))
+       }
+  }
   test ("props: one prop") {
        new PropParser {
            assert(List(Prop("hallo", ListVal(List("1", "2")))) === parseRule(props, "hallo = (1 2)"))
        }
   }
-  test ("prop: 'hallo = (1 2)' OK") {
+  test ("props: no props") {
+       new PropParser {
+           assert(List() === parseRule(props, ""))
+       }
+  }
+  test ("props: no props with space") {
+       new PropParser {
+           assert(List() === parseRule(props, " "))
+       }
+  }
+  test ("props: no props with \\n") {
+       new PropParser {
+           assert(List() === parseRule(props, "\n"))
+       }
+  }
+  test ("props: no props with multiple \\n") {
+       new PropParser {
+           assert(List() === parseRule(props, "\n\n\n"))
+       }
+  }
+  test ("prop: 'hallo = (1 2)'") {
        new PropParser {
            assert(Prop("hallo", ListVal(List("1", "2"))) === parseRule(prop, "hallo = (1 2)"))
        }
   }
-  test ("prop: 'hallo = du' OK") {
+  test ("prop: 'hallo = du'") {
        new PropParser {
            assert(Prop("hallo", SingleVal("du")) === parseRule(prop, "hallo = du"))
        }
   }
-  test ("prop: 'a=1' OK") {
+  test ("prop: 'a=1'") {
        new PropParser {
            assert(Prop("a", SingleVal("1")) === parseRule(prop, "a=1"))
        }
   }
-  test ("listVal: '(hallo du)' mit '\\t' OK") {
+  test ("listVal: '(hallo du)' mit '\\t'") {
        new PropParser {
            assert(ListVal(List("hallo", "du")) === parseRule(listVal, "(hallo\tdu)"))
        }
   }
-  test ("listVal: '(hallo du)' OK") {
+  test ("listVal: '()' empty") {
+       new PropParser {
+           assert(ListVal(List()) === parseRule(listVal, "()"))
+       }
+  }
+  test ("listVal: '(hallo du)'") {
        new PropParser {
            assert(ListVal(List("hallo", "du")) === parseRule(listVal, "(hallo du)"))
        }
   }
-  test ("listVal: '(1 2)' OK") {
+  test ("listVal: '(1 2)'") {
        new PropParser {
            assert(ListVal(List("1", "2")) === parseRule(listVal, "(1 2)"))
        }
@@ -161,12 +194,12 @@ b = hallo
          }
        }
   }
-  test ("singleVal: '_hallo' OK") {
+  test ("singleVal: '_hallo'") {
        new PropParser {
            assert(SingleVal("_hallo") === parseRule(singleVal, "_hallo"))
        }
   }
-  test ("singleVal: 'd' OK") {
+  test ("singleVal: 'd'") {
        new PropParser {
            assert(SingleVal("d") === parseRule(singleVal, "d"))
        }
